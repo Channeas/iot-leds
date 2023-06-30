@@ -98,15 +98,15 @@ export default class Server {
         return parser();
     }
 
-    addEndpoint(endpoint, httpMethod, handler) {
-        const endpointHandlers = this._endpoints.get(endpoint) || {};
+    addEndpoint(endpointPath, httpMethod, handler) {
+        const endpointHandlers = this._endpoints.get(endpointPath) || {};
         const upperCaseHttpMethod = httpMethod.toUpperCase();
 
         const methodAlreadyExistsForEndpoint =
             !!endpointHandlers[upperCaseHttpMethod];
         if (methodAlreadyExistsForEndpoint) {
             throw new Error(
-                `Endpoint ${endpoint} already has a handler for the ${upperCaseHttpMethod} method`
+                `Endpoint ${upperCaseHttpMethod} ${endpointPath} already has a handler`
             );
         }
 
