@@ -35,13 +35,19 @@ export default class Server {
                 return;
             }
 
-            const rawBody = await this._getBodyData(request);
-            const parsedBody = this._parseBody(
-                rawBody,
-                request.headers["content-type"]
-            );
+            const contentType = request.headers["content-type"];
 
-            const responseResult = await endpointHandler(parsedBody);
+            const rawBody = await this._getBodyData(request);
+            const parsedBody = this._parseBody(rawBody, contentType);
+
+            const queryString = request.url.split("?")[1];
+
+            const responseResult = await endpointHandler({
+                contentType,
+                parsedBody,
+                rawBody,
+                queryString
+            });
 
             if (!responseResult) {
                 response.writeHead(200);
