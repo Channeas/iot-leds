@@ -35,6 +35,14 @@ export default class Server {
                 return;
             }
 
+            let dynamicParameters;
+            if (endpointHandler.isDynamicEndpoint) {
+                dynamicParameters = this._getDynamicParameters(
+                    request.url,
+                    endpointHandler
+                );
+            }
+
             const contentType = request.headers["content-type"];
 
             const rawBody = await this._getBodyData(request);
@@ -42,8 +50,9 @@ export default class Server {
 
             const queryString = request.url.split("?")[1];
 
-            const responseResult = await endpointHandler({
+            const responseResult = await endpointHandler.handler({
                 contentType,
+                dynamicParameters,
                 parsedBody,
                 rawBody,
                 queryString
@@ -68,11 +77,72 @@ export default class Server {
         const urlWithoutQueryString = url.split("?")[0];
         const endpointHandlers = this._endpoints.get(urlWithoutQueryString);
 
-        if (!endpointHandlers) {
-            return null;
+        // First check if there is an exact match for the request URL, IE the URL is static
+        if (endpointHandlers && endpointHandlers[method]) {
+            return endpointHandlers[method];
         }
 
-        return endpointHandlers[method];
+        const dynamicEndpointHandlers = this._lookForDynamicEndpointHandler(
+            urlWithoutQueryString
+        );
+
+        return dynamicEndpointHandlers && dynamicEndpointHandlers[method];
+    }
+
+    _lookForDynamicEndpointHandler(url) {
+        return this._recursiveGenerateDynamicEndpoint(
+            "",
+            url.substring(1).split("/")
+        );
+    }
+
+    _recursiveGenerateDynamicEndpoint(startUrl, remainingUrlSegments) {
+        if (remainingUrlSegments.length === 0) {
+            return this._endpoints.get(startUrl);
+        }
+
+        const segments = [...remainingUrlSegments];
+        const foundMatch = this._recursiveGenerateDynamicEndpoint(
+            `${startUrl}/${segments.shift()}`,
+            segments
+        );
+        if (foundMatch) {
+            return foundMatch;
+        }
+
+        const secondMatch = this._recursiveGenerateDynamicEndpoint(
+            `${startUrl}/$DYNAMIC`,
+            segments
+        );
+        if (secondMatch) {
+            return secondMatch;
+        }
+
+        return null;
+    }
+
+    _getDynamicParameters(requestUrl, endpointHandler) {
+        const segments = requestUrl.split("/");
+        const dynamicSegments = endpointHandler.path.split("/");
+
+        const dynamicParameters = {};
+        let dynamicAliasIndex = 0;
+
+        for (const index in dynamicSegments) {
+            const isDynamic = dynamicSegments[index] === "$DYNAMIC";
+            if (isDynamic) {
+                const alias = endpointHandler.dynamicAliases[dynamicAliasIndex];
+                if (!alias) {
+                    continue;
+                }
+
+                const parameterValue = segments[index];
+                dynamicParameters[alias] = parameterValue;
+                dynamicAliasIndex++;
+            }
+        }
+
+        return dynamicParameters;
     }
 
     async _getBodyData(request) {
@@ -105,7 +175,18 @@ export default class Server {
     }
 
     addEndpoint(endpointPath, httpMethod, handler) {
-        const endpointHandlers = this._endpoints.get(endpointPath) || {};
+        let dynamicAliases = [];
+        let finalEndpointPath = endpointPath;
+
+        const isDynamicEndpoint = endpointPath.includes(":");
+        if (isDynamicEndpoint) {
+            const parsedDynamicEndpoint =
+                this._parseDynamicEndpointPath(endpointPath);
+            dynamicAliases = parsedDynamicEndpoint.aliases;
+            finalEndpointPath = parsedDynamicEndpoint.endpointPath;
+        }
+
+        const endpointHandlers = this._endpoints.get(finalEndpointPath) || {};
         const upperCaseHttpMethod = httpMethod.toUpperCase();
 
         const methodAlreadyExistsForEndpoint =
@@ -116,7 +197,34 @@ export default class Server {
             );
         }
 
-        endpointHandlers[upperCaseHttpMethod] = handler;
-        this._endpoints.set(endpoint, endpointHandlers);
+        endpointHandlers[upperCaseHttpMethod] = {
+            handler,
+            isDynamicEndpoint,
+            dynamicAliases,
+            path: finalEndpointPath
+        };
+        this._endpoints.set(finalEndpointPath, endpointHandlers);
+    }
+
+    _parseDynamicEndpointPath(dynamicPath) {
+        const aliases = [];
+
+        let modifiedPath = dynamicPath;
+        while (modifiedPath.includes(":")) {
+            const startIndex = modifiedPath.indexOf(":");
+            const endIndex = modifiedPath.indexOf("/", startIndex);
+            const alias = modifiedPath.slice(
+                startIndex + 1,
+                endIndex === -1 ? modifiedPath.length : endIndex
+            );
+
+            aliases.push(alias);
+            modifiedPath = modifiedPath.replace(`:${alias}`, "$DYNAMIC");
+        }
+
+        return {
+            endpointPath: modifiedPath,
+            aliases
+        };
     }
 }

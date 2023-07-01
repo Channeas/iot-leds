@@ -18,12 +18,12 @@ function setup() {
         };
     });
 
-    server.addEndpoint("/status", "POST", (requestData) => {
+    server.addEndpoint("/status/:ledId", "POST", (requestData) => {
         // TODO: Set status
         console.log("Got a post with the following request data", requestData);
     });
 
-    server.addEndpoint("/status", "GET", () => {
+    server.addEndpoint("/status/:ledId", "GET", () => {
         // TODO: Get status
         console.log("Got a GET asking for the LED status");
     });
