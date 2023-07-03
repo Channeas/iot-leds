@@ -124,21 +124,18 @@ export default class Server {
     _getDynamicParameters(requestUrl, endpointHandler) {
         const segments = requestUrl.split("/");
         const dynamicSegments = endpointHandler.path.split("/");
-
         const dynamicParameters = {};
-        let dynamicAliasIndex = 0;
 
         for (const index in dynamicSegments) {
-            const isDynamic = dynamicSegments[index] === "$DYNAMIC";
+            const isDynamic = dynamicSegments[index].startsWith(":");
             if (isDynamic) {
-                const alias = endpointHandler.dynamicAliases[dynamicAliasIndex];
+                const alias = dynamicSegments[index].substring(1);
                 if (!alias) {
                     continue;
                 }
 
                 const parameterValue = segments[index];
                 dynamicParameters[alias] = parameterValue;
-                dynamicAliasIndex++;
             }
         }
 
@@ -175,18 +172,15 @@ export default class Server {
     }
 
     addEndpoint(endpointPath, httpMethod, handler) {
-        let dynamicAliases = [];
-        let finalEndpointPath = endpointPath;
+        let dynamicPath;
 
         const isDynamicEndpoint = endpointPath.includes(":");
         if (isDynamicEndpoint) {
-            const parsedDynamicEndpoint =
-                this._parseDynamicEndpointPath(endpointPath);
-            dynamicAliases = parsedDynamicEndpoint.aliases;
-            finalEndpointPath = parsedDynamicEndpoint.endpointPath;
+            dynamicPath = this._parseDynamicEndpointPath(endpointPath);
         }
 
-        const endpointHandlers = this._endpoints.get(finalEndpointPath) || {};
+        const endpointHandlers =
+            this._endpoints.get(dynamicPath || endpointPath) || {};
         const upperCaseHttpMethod = httpMethod.toUpperCase();
 
         const methodAlreadyExistsForEndpoint =
@@ -200,16 +194,16 @@ export default class Server {
         endpointHandlers[upperCaseHttpMethod] = {
             handler,
             isDynamicEndpoint,
-            dynamicAliases,
-            path: finalEndpointPath
+            dynamicPath,
+            path: endpointPath
         };
-        this._endpoints.set(finalEndpointPath, endpointHandlers);
+        this._endpoints.set(dynamicPath || endpointPath, endpointHandlers);
     }
 
-    _parseDynamicEndpointPath(dynamicPath) {
+    _parseDynamicEndpointPath(initialPath) {
         const aliases = [];
 
-        let modifiedPath = dynamicPath;
+        let modifiedPath = initialPath;
         while (modifiedPath.includes(":")) {
             const startIndex = modifiedPath.indexOf(":");
             const endIndex = modifiedPath.indexOf("/", startIndex);
@@ -222,9 +216,6 @@ export default class Server {
             modifiedPath = modifiedPath.replace(`:${alias}`, "$DYNAMIC");
         }
 
-        return {
-            endpointPath: modifiedPath,
-            aliases
-        };
+        return modifiedPath;
     }
 }
