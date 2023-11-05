@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>LED Dashboard</title>
+
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap"
+            rel="stylesheet"
+        />
+
+        <style>
+            body {
+                background-color: #f2f5f8;
+                font-family: "Montserrat", sans-serif;
+                margin: 0;
+            }
+
+            #container {
+                padding: 10px;
+                display: flex;
+                gap: 20px;
+                height: 100%;
+                width: 100%;
+                max-width: 1100px;
+                margin: auto;
+                flex-wrap: wrap;
+                justify-content: space-around;
+                box-sizing: border-box;
+            }
+
+            .ledContainer {
+                width: 200px;
+                background-color: #fff;
+                box-shadow: 0px 5px 15px -3px rgba(0, 0, 0, 0.1);
+                padding: 20px;
+                border-radius: 6px;
+                text-align: center;
+            }
+
+            .ledTitle {
+                margin: 0;
+                font-size: 20px;
+                font-weight: bold;
+            }
+
+            .ledStatusDisabled {
+                color: #f62447;
+            }
+
+            .ledStatusEnabled {
+                display: none;
+                color: #65c728;
+            }
+
+            [data-is-enabled="true"] .ledStatusDisabled {
+                display: none;
+            }
+
+            [data-is-enabled="true"] .ledStatusEnabled {
+                display: block;
+            }
+
+            button {
+                width: 100%;
+                padding: 8px;
+                border: none;
+                border-radius: 6px;
+                background-color: #3c6ee0;
+                box-shadow: -1px 3px 10px 0px rgba(60, 110, 224, 0.4);
+                -webkit-box-shadow: -1px 3px 10px 0px rgba(60, 110, 224, 0.4);
+                -moz-box-shadow: -1px 3px 10px 0px rgba(60, 110, 224, 0.4);
+                color: #fff;
+                cursor: pointer;
+                transition: 0.25s;
+            }
+
+            button:hover {
+                background-color: #3663c9;
+                box-shadow: -1px 3px 10px 0px rgba(54, 99, 201, 0.4);
+                -webkit-box-shadow: -1px 3px 10px 0px rgba(54, 99, 201, 0.4);
+                -moz-box-shadow: -1px 3px 10px 0px rgba(54, 99, 201, 0.4);
+            }
+
+            button:active {
+                background-color: #3058b3;
+                box-shadow: -1px 3px 10px 0px rgba(48, 88, 179, 0.4);
+                -webkit-box-shadow: -1px 3px 10px 0px rgba(48, 88, 179, 0.4);
+                -moz-box-shadow: -1px 3px 10px 0px rgba(48, 88, 179, 0.4);
+            }
+        </style>
+    </head>
+    <body>
+        <div id="container"></div>
+
+        <script>
+            const numberOfLeds = 4;
+            const ledContainers = [];
+
+            async function setup() {
+                const container = document.querySelector("#container");
+
+                for (let index = 0; index < numberOfLeds; index++) {
+                    const ledContainer = createLedContainer(index);
+
+                    container.appendChild(ledContainer);
+                    ledContainers.push(ledContainer);
+                }
+
+                main();
+                // I know I know, extremely suboptimal way to poll, but the main focus for me is on the actual Arduino code, not the html/js side
+                setInterval(main, 500);
+            }
+
+            function createLedContainer(ledIndex) {
+                const ledContainer = document.createElement("div");
+                ledContainer.classList.add("ledContainer");
+
+                const ledTitle = document.createElement("p");
+                ledTitle.classList.add("ledTitle");
+                ledTitle.textContent = `LED ${ledIndex}`;
+
+                const ledStatusDisabled = document.createElement("p");
+                ledStatusDisabled.classList.add("ledStatusDisabled");
+                ledStatusDisabled.textContent = "Disabled";
+
+                const ledStatusEnabled = document.createElement("p");
+                ledStatusEnabled.classList.add("ledStatusEnabled");
+                ledStatusEnabled.textContent = "Enabled";
+
+                const toggleButton = document.createElement("button");
+                toggleButton.textContent = "Turn on";
+                toggleButton.addEventListener("click", () =>
+                    toggleLed(ledIndex)
+                );
+
+                ledContainer.appendChild(ledTitle);
+                ledContainer.appendChild(ledStatusDisabled);
+                ledContainer.appendChild(ledStatusEnabled);
+                ledContainer.appendChild(toggleButton);
+
+                return ledContainer;
+            }
+
+            function main() {
+                for (const index in ledContainers) {
+                    const ledContainer = ledContainers[index];
+                    updateStatus(index, ledContainer);
+                }
+            }
+
+            async function updateStatus(ledIndex, ledContainer) {
+                const currentStatus = await getStatus(ledIndex);
+
+                const toggleButton = ledContainer.querySelector("button");
+
+                const isEnabled = currentStatus === "1";
+                toggleButton.textContent = `Turn ${isEnabled ? "off" : "on"}`;
+
+                ledContainer.dataset.isEnabled = isEnabled;
+            }
+
+            async function toggleLed(ledIndex) {
+                const ledContainer = ledContainers[ledIndex];
+                const isEnabled = ledContainer.dataset.isEnabled === "true";
+                const newStatus = isEnabled ? 0 : 1;
+
+                await setStatus(ledIndex, newStatus);
+            }
+
+            async function getStatus(ledIndex) {
+                const response = await fetch(`/status/${ledIndex}`);
+                return response.text();
+            }
+
+            async function setStatus(ledIndex, status = 1) {
+                const response = await fetch(`/status/${ledIndex}`, {
+                    method: "POST",
+                    body: status ? "1" : "0",
+                    headers: {
+                        "Content-Type": "text/plain"
+                    }
+                });
+            }
+
+            setup();
+        </script>
+    </body>
+</html>
