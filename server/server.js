@@ -114,11 +114,8 @@ export default class Server {
             `${startUrl}/$DYNAMIC`,
             segments
         );
-        if (secondMatch) {
-            return secondMatch;
-        }
 
-        return null;
+        return secondMatch;
     }
 
     _getDynamicParameters(requestUrl, endpointHandler) {
