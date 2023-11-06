@@ -8,7 +8,7 @@ char host[] = "192.168.50.238";
 int port = 8080;
 
 int numberOfLeds = 4;
-int startingLedPin = 2; // TODO: Confirm this after wiring
+int startingLedPin = 2;
 
 void setup() {
   Serial.begin(9600);
@@ -22,7 +22,9 @@ void setup() {
     while (true);
   }
 
-  // TODO: Set up pinmodes
+  for (int pinIndex = startingLedPin; pinIndex < startingLedPin + numberOfLeds; pinIndex++) {
+    pinMode(pinIndex, OUTPUT);
+  }
 }
 
 void loop() {
@@ -30,16 +32,17 @@ void loop() {
     int pinIndex = startingLedPin + ledId;
 
     if (shouldLedBeOn(ledId)) {
-      // TODO: Write high to this specific pin
+      digitalWrite(pinIndex, HIGH);
     } else {
-      // TODO: Write low to this specific pin
+      digitalWrite(pinIndex, LOW);
     }
   }
 
-  delay(1000);
+  delay(100);
 }
 
 bool connectToWifi(char* ssid, char* password) {
+  // TODO: Reconnect if disconnected?
   Serial.print("Attempting to connect to ");
   Serial.println(ssid);
 
